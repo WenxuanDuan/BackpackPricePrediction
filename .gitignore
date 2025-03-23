@@ -3,3 +3,4 @@
 # 忽略整个文件夹
 dataset/
 figures/
+__pycache__/

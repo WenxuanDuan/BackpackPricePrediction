@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import os
 
 # 创建图表保存目录
-output_dir = 'figures'
+output_dir = '../figures'
 os.makedirs(output_dir, exist_ok=True)
 
 # 读取数据
-train_data = pd.read_csv('dataset/train.csv')
-test_data = pd.read_csv('dataset/test.csv')
+train_data = pd.read_csv('../dataset/train.csv')
+test_data = pd.read_csv('../dataset/test.csv')
 
 # 显示所有列
 pd.set_option('display.max_columns', None)
@@ -54,9 +54,9 @@ with open(f'{output_dir}/duplicate_rows.txt', 'w') as f:
 train_data.describe().to_csv(f'{output_dir}/train_describe.csv')
 
 # 数值和类别变量
-numerical_variables = ['Weight Capacity (kg)', 'Compartments']
+numerical_variables = ['Weight Capacity (kg)']
 target_variable = 'Price'
-categorical_variables = ['Brand', 'Material', 'Size', 'Laptop Compartment','Waterproof', 'Style', 'Color']
+categorical_variables = ['Brand', 'Material', 'Size', 'Compartments', 'Laptop Compartment','Waterproof', 'Style', 'Color']
 
 # 自定义颜色
 custom_palette = ['#3498db', '#e74c3c']
