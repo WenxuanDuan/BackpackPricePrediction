@@ -8,10 +8,13 @@ from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.neural_network import MLPRegressor
+from sklearn.linear_model import Ridge, Lasso, ElasticNet
 from sklearn.svm import SVR
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
 from dataPreprocessing import preprocess_data
+from lightgbm import LGBMRegressor
+
 
 def evaluate_models(train_X, y, models, n_splits=10):
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
@@ -84,12 +87,17 @@ def run():
     train_X, test_X, y, test_id = preprocess_data('../dataset/train.csv', '../dataset/test.csv')
 
     models = {
+        "KNN (k=5)": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
         "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
         "XGBoost": XGBRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbosity=0),
         "CatBoost": CatBoostRegressor(iterations=100, random_seed=42, verbose=0),
+        "LightGBM": LGBMRegressor(n_estimators=100, random_state=42, n_jobs=-1),
         "KNN (k=5)": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
         "MLP": MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000, early_stopping=True,
-                                        validation_fraction=0.1, n_iter_no_change=10,random_state=42)
+                                        validation_fraction=0.1, n_iter_no_change=10,random_state=42),
+        "Ridge": Ridge(alpha=1.0),
+        "Lasso": Lasso(alpha=0.1),
+        "ElasticNet": ElasticNet(alpha=0.1, l1_ratio=0.5)
     }
 
     results = evaluate_models(train_X, y, models)
