@@ -1,0 +1,5 @@
+.DS_Store
+
+# 忽略整个文件夹
+dataset/
+figures/
