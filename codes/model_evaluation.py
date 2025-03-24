@@ -83,8 +83,8 @@ def run():
     train_X, test_X, y, test_id = preprocess_data('../dataset/train.csv', '../dataset/test.csv')
 
     models = {
-        # "KNN (k=5)": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
-        # "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
+        "KNN (k=5)": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
+        "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
         "XGBoost": XGBRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbosity=0),
         "CatBoost": CatBoostRegressor(iterations=100, random_seed=42, verbose=0),
         "LightGBM": LGBMRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbose=-1),
@@ -98,17 +98,19 @@ def run():
     # 基础模型评估
     results = evaluate_models(train_X, y, models)
 
-    # 转为 DataFrame 以便排序和获取 Top 3 模型名
-    results_df = pd.DataFrame(results).T.sort_values("avg_rmse")
-    top3_names = results_df.head(3).index.tolist()
-    print(f"\nTop 3 models for voting: {top3_names}")
-
-    # 构造 VotingRegressor
-    top3_models = [(name, models[name]) for name in top3_names]
-    voting_model = VotingRegressor(estimators=top3_models)
+    # Voting
+    top_models = [
+        ("Ridge", Ridge(alpha=1.0)),  # 线性模型（泛化能力强）
+        ("LightGBM", LGBMRegressor(n_estimators=100,  # Boosting 模型（非线性、强拟合能力）
+                                   random_state=42, n_jobs=-1, verbose=-1)),
+        ("MLP", MLPRegressor(hidden_layer_sizes=(64, 32),  # 神经网络（补充非线性关系）
+                             max_iter=1000, early_stopping=True,
+                             validation_fraction=0.1, n_iter_no_change=10, random_state=42))
+    ]
+    voting_model = VotingRegressor(estimators=top_models)
 
     # 对 VotingRegressor 做评估
-    print("\nEvaluating: VotingRegressor (Top 3)")
+    print("\nEvaluating: VotingRegressor (Ridge, LightGBM, MLP)")
     rmse_scores = []
     times = []
     kf = KFold(n_splits=10, shuffle=True, random_state=42)
@@ -127,7 +129,7 @@ def run():
         times.append(elapsed)
         print(f"  Fold {fold} - RMSE: {rmse:.4f} | Time: {elapsed:.2f} sec")
 
-    results["VotingRegressor (Top 3)"] = {
+    results["Voting(Ridge, LightGBM, MLP)"] = {
         "avg_rmse": np.mean(rmse_scores),
         "avg_time_per_fold": np.mean(times)
     }
