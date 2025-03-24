@@ -124,6 +124,75 @@ def export_predictions(train_X, test_X, y, test_id):
     submission.to_csv(output_path, index=False)
     print(f"✅ Prediction saved to: {output_path}")
 
+
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.ensemble import StackingRegressor
+from sklearn.linear_model import Ridge, ElasticNet
+from sklearn.neural_network import MLPRegressor
+from lightgbm import LGBMRegressor
+
+def plot_stacking_diagnostics(train_X, y, output_dir="../figures"):
+    """
+    生成两个图：
+    1. Predicted vs. True Prices (散点图)
+    2. Prediction Error Distribution (误差分布直方图)
+
+    参数:
+        train_X (pd.DataFrame): 训练特征
+        y (pd.Series): 目标价格
+        output_dir (str): 图像输出目录
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 构建 stacking 模型
+    base_models = [
+        ("Ridge", Ridge(alpha=1.0)),
+        ("LightGBM", LGBMRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbose=-1)),
+        ("MLP", MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000,
+                             early_stopping=True, validation_fraction=0.1,
+                             n_iter_no_change=10, random_state=42))
+    ]
+    meta_model = ElasticNet(alpha=0.1, l1_ratio=0.5)
+
+    stacking_model = StackingRegressor(
+        estimators=base_models,
+        final_estimator=meta_model,
+        passthrough=True,
+        n_jobs=-1
+    )
+
+    # 拟合并预测
+    stacking_model.fit(train_X, y)
+    y_pred = stacking_model.predict(train_X)
+    errors = y - y_pred
+
+    # 图1：Predicted vs. True
+    plt.figure(figsize=(6, 6))
+    sns.scatterplot(x=y, y=y_pred, alpha=0.3)
+    plt.plot([y.min(), y.max()], [y.min(), y.max()], color='red', linestyle='--')
+    plt.xlabel("True Price")
+    plt.ylabel("Predicted Price")
+    plt.title("Predicted vs. True Prices (Stacking Model)")
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/predicted_vs_true_stacking.png", dpi=300)
+    plt.close()
+
+    # 图2：误差分布图
+    plt.figure(figsize=(6, 4))
+    sns.histplot(errors, bins=50, kde=True, color='orange')
+    plt.xlabel("Prediction Error (y_true - y_pred)")
+    plt.ylabel("Frequency")
+    plt.title("Error Distribution (Stacking Model)")
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/error_distribution_stacking.png", dpi=300)
+    plt.close()
+
+    print(f"✅ 图表已保存到: {output_dir}/")
+
+
+
 # 主程序
 def run():
     train_X, test_X, y, test_id = preprocess_data('../dataset/train.csv', '../dataset/test.csv')
@@ -184,6 +253,8 @@ def run():
     plot_model_comparison(results, output_path="../figures/model_comparison.png")
 
     # export_predictions(train_X, test_X, y, test_id)
+
+    plot_stacking_diagnostics(train_X, y)
 
 
 if __name__ == "__main__":
