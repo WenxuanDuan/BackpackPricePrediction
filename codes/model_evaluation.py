@@ -242,19 +242,26 @@ def run():
         "Stacking (Ridge+LGBM+MLP, HistGradientBoosting)": stacking_model_h
     }
 
-    # 基础模型评估
-    results = evaluate_models(train_X, y, models)
-
-    # 输出最终比较表格 & 图
-    final_results_df = pd.DataFrame(results).T.sort_values("avg_rmse")
-    print("\nFinal Comparison:")
-    print(final_results_df)
-
-    plot_model_comparison(results, output_path="../figures/model_comparison.png")
+    # # 基础模型评估
+    # results = evaluate_models(train_X, y, models)
+    #
+    # # 输出最终比较表格 & 图
+    # final_results_df = pd.DataFrame(results).T.sort_values("avg_rmse")
+    # print("\nFinal Comparison:")
+    # print(final_results_df)
+    #
+    # plot_model_comparison(results, output_path="../figures/model_comparison.png")
 
     # export_predictions(train_X, test_X, y, test_id)
 
-    plot_stacking_diagnostics(train_X, y)
+    # plot_stacking_diagnostics(train_X, y)
+
+
+    ## 保存训练好的模型
+    stacking_model_e.fit(train_X, y)
+    os.makedirs("../models", exist_ok=True)
+    joblib.dump(stacking_model_e, "../models/stacking_model.pkl")
+    print("✅ 模型已保存为 ../models/stacking_model.pkl")
 
 
 if __name__ == "__main__":
