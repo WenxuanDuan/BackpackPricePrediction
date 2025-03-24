@@ -5,5 +5,3 @@ dataset/
 figures/
 __pycache__/
 codes/catboost_info/
-outputs/
-models/
