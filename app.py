@@ -2,6 +2,7 @@ import streamlit as st
 st.set_page_config(page_title="Backpack Price Predictor", layout="centered")
 
 import joblib
+import numpy as np
 import pandas as pd
 from codes.dataPreprocessing import preprocess_data
 from utils import preprocess_user_input
@@ -18,6 +19,7 @@ model = load_model()
 train_X, _, _, _ = preprocess_data("dataset/train.csv", "dataset/test.csv")
 reference_columns = train_X.columns.tolist()
 weight_max = 30.0  # 从训练集中最大值提取（也可动态设置）
+
 
 # ------------------------- 🎨 PAGE UI -------------------------
 
@@ -63,7 +65,9 @@ if st.button("🎯 Predict Price"):
         try:
             input_df = preprocess_user_input(user_input, reference_columns, weight_max)
             pred_price = model.predict(input_df)[0]
-            st.success(f"💸 Predicted Backpack Price: **${pred_price:.2f}**")
+            st.success(f"💸 Predicted Backpack Price: ${pred_price:.2f}")
+            # st.write("🧪 Input shape:", input_df.shape)
+            # st.write("📚 Model input shape:", model.n_features_in_)
         except Exception as e:
             st.error("❌ An error occurred during prediction.")
             st.exception(e)

@@ -77,6 +77,9 @@ def preprocess_data(train_path, test_path):
     # 分离目标变量
     y = train['Price']
     train = train.drop(['Price'], axis=1)
+    # print(y.describe())
+    # print(train.shape)  # 295522, N
+    # print(y.shape)  # 295522
 
     # 对数变换（处理偏态）
     train = apply_log_transform(train, numerical_features)

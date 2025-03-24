@@ -1,6 +1,7 @@
 import time
 import joblib
 import os
+import seaborn as sns
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -18,7 +19,6 @@ from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from dataPreprocessing import preprocess_data
-
 
 # 模型评估函数
 def evaluate_models(train_X, y, models, n_splits=10):
@@ -125,14 +125,6 @@ def export_predictions(train_X, test_X, y, test_id):
     print(f"✅ Prediction saved to: {output_path}")
 
 
-import os
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.ensemble import StackingRegressor
-from sklearn.linear_model import Ridge, ElasticNet
-from sklearn.neural_network import MLPRegressor
-from lightgbm import LGBMRegressor
-
 def plot_stacking_diagnostics(train_X, y, output_dir="../figures"):
     """
     生成两个图：
@@ -213,7 +205,7 @@ def run():
     base_models = top_models
     stacking_model_e = StackingRegressor(
         estimators=base_models,
-        final_estimator=ExtraTreesRegressor(n_estimators=100, random_state=42, n_jobs=-1),
+        final_estimator=ElasticNet(alpha=0.1, l1_ratio=0.5),
         passthrough=True,  # 也保留原始特征（推荐）
         n_jobs=-1
     )
@@ -238,24 +230,23 @@ def run():
         "Lasso": Lasso(alpha=0.1),
         "ElasticNet": ElasticNet(alpha=0.1, l1_ratio=0.5),
         "Voting (Ridge+LGBM+MLP)": voting_model,
-        "Stacking (Ridge+LGBM+MLP, ExtraTrees)": stacking_model_e,
+        "Stacking (Ridge+LGBM+MLP, ElasticNet)": stacking_model_e,
         "Stacking (Ridge+LGBM+MLP, HistGradientBoosting)": stacking_model_h
     }
 
-    # # 基础模型评估
-    # results = evaluate_models(train_X, y, models)
-    #
-    # # 输出最终比较表格 & 图
-    # final_results_df = pd.DataFrame(results).T.sort_values("avg_rmse")
-    # print("\nFinal Comparison:")
-    # print(final_results_df)
-    #
-    # plot_model_comparison(results, output_path="../figures/model_comparison.png")
+    # 基础模型评估
+    results = evaluate_models(train_X, y, models)
 
-    # export_predictions(train_X, test_X, y, test_id)
+    # 输出最终比较表格 & 图
+    final_results_df = pd.DataFrame(results).T.sort_values("avg_rmse")
+    print("\nFinal Comparison:")
+    print(final_results_df)
 
-    # plot_stacking_diagnostics(train_X, y)
+    plot_model_comparison(results, output_path="../figures/model_comparison.png")
 
+    export_predictions(train_X, test_X, y, test_id)
+
+    plot_stacking_diagnostics(train_X, y)
 
     ## 保存训练好的模型
     stacking_model_e.fit(train_X, y)
@@ -263,6 +254,11 @@ def run():
     joblib.dump(stacking_model_e, "../models/stacking_model.pkl")
     print("✅ 模型已保存为 ../models/stacking_model.pkl")
 
+    ## 保存新模型，log1p
+    # stacking_model_e.fit(train_X, y)
+    # os.makedirs("../models", exist_ok=True)
+    # joblib.dump(stacking_model_e, "../models/stacking_model_log.pkl")
+    # print("✅ 模型已保存为 ../models/stacking_model_log.pkl")
 
 if __name__ == "__main__":
     run()
