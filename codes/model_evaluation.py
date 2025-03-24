@@ -1,4 +1,6 @@
 import time
+import joblib
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,6 +11,8 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.linear_model import Ridge, Lasso, ElasticNet
 from sklearn.ensemble import RandomForestRegressor, VotingRegressor
 from sklearn.ensemble import StackingRegressor
+from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.svm import SVR
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
@@ -79,11 +83,51 @@ def plot_model_comparison(results_dict, output_path="../figures/model_comparison
     print(f"✅ Plot saved to: {output_path}")
 
 
+def export_predictions(train_X, test_X, y, test_id):
+    print("\n🔮 Exporting test predictions for best model...")
+
+    # 定义 base models 和 meta model（跟你之前设置的保持一致）
+    base_models = [
+        ("Ridge", Ridge(alpha=1.0)),
+        ("LightGBM", LGBMRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbose=-1)),
+        ("MLP", MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000,
+                             early_stopping=True, validation_fraction=0.1,
+                             n_iter_no_change=10, random_state=42))
+    ]
+    meta_model = ElasticNet(alpha=0.1, l1_ratio=0.5)
+
+    # 构造 stacking 模型
+    stacking_model = StackingRegressor(
+        estimators=base_models,
+        final_estimator=meta_model,
+        passthrough=True,
+        n_jobs=-1
+    )
+
+    # 拟合完整训练集
+    stacking_model.fit(train_X, y)
+
+    # 预测测试集
+    preds = stacking_model.predict(test_X)
+
+    # 构建 DataFrame
+    submission = pd.DataFrame({
+        "id": test_id,
+        "Predicted Price": preds
+    })
+
+    # 确保保存路径存在
+    os.makedirs("../outputs", exist_ok=True)
+
+    # 保存为 CSV
+    output_path = "../outputs/stacking_elasticnet_predictions.csv"
+    submission.to_csv(output_path, index=False)
+    print(f"✅ Prediction saved to: {output_path}")
+
 # 主程序
 def run():
     train_X, test_X, y, test_id = preprocess_data('../dataset/train.csv', '../dataset/test.csv')
 
-    # Voting model
     top_models = [
         ("Ridge", Ridge(alpha=1.0)),  # 线性模型（泛化能力强）
         ("LightGBM", LGBMRegressor(n_estimators=100,  # Boosting 模型（非线性、强拟合能力）
@@ -92,31 +136,41 @@ def run():
                              max_iter=1000, early_stopping=True,
                              validation_fraction=0.1, n_iter_no_change=10, random_state=42))
     ]
+
+    # Voting model
     voting_model = VotingRegressor(estimators=top_models)
 
     # Stacking model
     base_models = top_models
-    meta_model = ElasticNet(alpha=0.1, l1_ratio=0.5)
-    stacking_model = StackingRegressor(
+    stacking_model_e = StackingRegressor(
         estimators=base_models,
-        final_estimator=meta_model,
+        final_estimator=ExtraTreesRegressor(n_estimators=100, random_state=42, n_jobs=-1),
+        passthrough=True,  # 也保留原始特征（推荐）
+        n_jobs=-1
+    )
+    stacking_model_h = StackingRegressor(
+        estimators=base_models,
+        final_estimator=HistGradientBoostingRegressor(max_iter=100, random_state=42),
         passthrough=True,  # 也保留原始特征（推荐）
         n_jobs=-1
     )
 
     models = {
-        # "KNN (k=5)": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
-        # "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
-        # "XGBoost": XGBRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbosity=0),
-        # "CatBoost": CatBoostRegressor(iterations=100, random_seed=42, verbose=0),
-        # "LGBM": LGBMRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbose=-1),
-        # "MLP": MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000, early_stopping=True,
-        #                     validation_fraction=0.1, n_iter_no_change=10, random_state=42),
-        # "Ridge": Ridge(alpha=1.0),
-        # "Lasso": Lasso(alpha=0.1),
-        # "ElasticNet": ElasticNet(alpha=0.1, l1_ratio=0.5),
-        # "Voting (Ridge+LGBM+MLP)": voting_model,
-        "Stacking (Ridge+LGBM+MLP)": stacking_model
+        "KNN (k=5)": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
+        "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
+        "ExtraTrees": ExtraTreesRegressor(n_estimators=100, random_state=42, n_jobs=-1),
+        "HistGradientBoosting": HistGradientBoostingRegressor(max_iter=100, random_state=42),
+        "XGBoost": XGBRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbosity=0),
+        "CatBoost": CatBoostRegressor(iterations=100, random_seed=42, verbose=0),
+        "LGBM": LGBMRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbose=-1),
+        "MLP": MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000, early_stopping=True,
+                            validation_fraction=0.1, n_iter_no_change=10, random_state=42),
+        "Ridge": Ridge(alpha=1.0),
+        "Lasso": Lasso(alpha=0.1),
+        "ElasticNet": ElasticNet(alpha=0.1, l1_ratio=0.5),
+        "Voting (Ridge+LGBM+MLP)": voting_model,
+        "Stacking (Ridge+LGBM+MLP, ExtraTrees)": stacking_model_e,
+        "Stacking (Ridge+LGBM+MLP, HistGradientBoosting)": stacking_model_h
     }
 
     # 基础模型评估
@@ -128,6 +182,8 @@ def run():
     print(final_results_df)
 
     plot_model_comparison(results, output_path="../figures/model_comparison.png")
+
+    # export_predictions(train_X, test_X, y, test_id)
 
 
 if __name__ == "__main__":
