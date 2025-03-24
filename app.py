@@ -2,7 +2,6 @@ import streamlit as st
 import joblib
 import numpy as np
 import pandas as pd
-from codes.dataPreprocessing import preprocess_data
 from utils import preprocess_user_input
 
 # ------------------------- 🔧 Streamlit Config -------------------------
@@ -14,20 +13,29 @@ st.set_page_config(page_title="Backpack Price Predictor", layout="centered")
 def load_model():
     return joblib.load("models/stacking_model.pkl")
 
-@st.cache_data
+@st.cache_resource
 def load_reference_columns():
-    train_X, _, _, _ = preprocess_data("dataset/train.csv", "dataset/test.csv")
-    return train_X.columns.tolist(), train_X["Weight Capacity (kg)"].max()
+    return joblib.load("models/reference_columns.pkl")
 
-# ------------------------- 🔄 Load Model & Columns -------------------------
+@st.cache_resource
+def load_weight_max():
+    return joblib.load("models/weight_max.pkl")
+
+@st.cache_resource
+def load_scaler():
+    return joblib.load("models/minmax_scaler.pkl")
+
+# ------------------------- 🔄 Load Model & Resources -------------------------
 
 model = load_model()
-reference_columns, weight_max = load_reference_columns()
+reference_columns = load_reference_columns()
+weight_max = load_weight_max()
+scaler = load_scaler()
 
 # ------------------------- 🎨 Page UI -------------------------
 
 st.title("🎒 Backpack Price Predictor")
-st.markdown("Predict the price 💰 of your backpack.")
+st.markdown("Predict the price 💰 of your backpack based on key features.")
 
 st.markdown("---")
 st.header("🧾 Select Backpack Features")
@@ -69,14 +77,14 @@ st.markdown("---")
 if st.button("🔮 Predict Backpack Price"):
     with st.spinner("Predicting... please wait ⏳"):
         try:
-            input_df = preprocess_user_input(user_input, reference_columns, weight_max)
-            price_pred = model.predict(input_df)[0]
-            st.success(f"💸 Predicted Backpack Price: ${price_pred:.2f}")
-
-            # Debug info
-            # st.write("🧪 Input shape:", input_df.shape)
-            # st.write("📚 Model input shape:", model.n_features_in_)
+            input_df = preprocess_user_input(user_input, reference_columns, weight_max, scaler)
+            price = model.predict(input_df)[0]
+            st.success(f"💸 Predicted Backpack Price: ${price:.2f}")
 
         except Exception as e:
             st.error("❌ Something went wrong during prediction.")
             st.exception(e)
+
+# Optional footer
+st.markdown("---")
+st.markdown("<div style='text-align:center; font-size:13px;'>Made with ❤️ by Team Backpack</div>", unsafe_allow_html=True)
