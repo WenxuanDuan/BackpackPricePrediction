@@ -4,10 +4,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
-from sklearn.ensemble import RandomForestRegressor, VotingRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.linear_model import Ridge, Lasso, ElasticNet
+from sklearn.ensemble import RandomForestRegressor, VotingRegressor
+from sklearn.ensemble import StackingRegressor
 from sklearn.svm import SVR
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
@@ -82,23 +83,7 @@ def plot_model_comparison(results_dict, output_path="../figures/model_comparison
 def run():
     train_X, test_X, y, test_id = preprocess_data('../dataset/train.csv', '../dataset/test.csv')
 
-    models = {
-        "KNN (k=5)": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
-        "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
-        "XGBoost": XGBRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbosity=0),
-        "CatBoost": CatBoostRegressor(iterations=100, random_seed=42, verbose=0),
-        "LightGBM": LGBMRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbose=-1),
-        "MLP": MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000, early_stopping=True,
-                            validation_fraction=0.1, n_iter_no_change=10, random_state=42),
-        "Ridge": Ridge(alpha=1.0),
-        "Lasso": Lasso(alpha=0.1),
-        "ElasticNet": ElasticNet(alpha=0.1, l1_ratio=0.5)
-    }
-
-    # 基础模型评估
-    results = evaluate_models(train_X, y, models)
-
-    # Voting
+    # Voting model
     top_models = [
         ("Ridge", Ridge(alpha=1.0)),  # 线性模型（泛化能力强）
         ("LightGBM", LGBMRegressor(n_estimators=100,  # Boosting 模型（非线性、强拟合能力）
@@ -109,30 +94,33 @@ def run():
     ]
     voting_model = VotingRegressor(estimators=top_models)
 
-    # 对 VotingRegressor 做评估
-    print("\nEvaluating: VotingRegressor (Ridge, LightGBM, MLP)")
-    rmse_scores = []
-    times = []
-    kf = KFold(n_splits=10, shuffle=True, random_state=42)
-    for fold, (train_idx, val_idx) in enumerate(kf.split(train_X), 1):
-        X_train, X_val = train_X.iloc[train_idx], train_X.iloc[val_idx]
-        y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+    # Stacking model
+    base_models = top_models
+    meta_model = ElasticNet(alpha=0.1, l1_ratio=0.5)
+    stacking_model = StackingRegressor(
+        estimators=base_models,
+        final_estimator=meta_model,
+        passthrough=True,  # 也保留原始特征（推荐）
+        n_jobs=-1
+    )
 
-        start = time.time()
-        voting_model.fit(X_train, y_train)
-        preds = voting_model.predict(X_val)
-        end = time.time()
-
-        rmse = np.sqrt(mean_squared_error(y_val, preds))
-        elapsed = end - start
-        rmse_scores.append(rmse)
-        times.append(elapsed)
-        print(f"  Fold {fold} - RMSE: {rmse:.4f} | Time: {elapsed:.2f} sec")
-
-    results["Voting(Ridge, LightGBM, MLP)"] = {
-        "avg_rmse": np.mean(rmse_scores),
-        "avg_time_per_fold": np.mean(times)
+    models = {
+        # "KNN (k=5)": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
+        # "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
+        # "XGBoost": XGBRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbosity=0),
+        # "CatBoost": CatBoostRegressor(iterations=100, random_seed=42, verbose=0),
+        # "LGBM": LGBMRegressor(n_estimators=100, random_state=42, n_jobs=-1, verbose=-1),
+        # "MLP": MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000, early_stopping=True,
+        #                     validation_fraction=0.1, n_iter_no_change=10, random_state=42),
+        # "Ridge": Ridge(alpha=1.0),
+        # "Lasso": Lasso(alpha=0.1),
+        # "ElasticNet": ElasticNet(alpha=0.1, l1_ratio=0.5),
+        # "Voting (Ridge+LGBM+MLP)": voting_model,
+        "Stacking (Ridge+LGBM+MLP)": stacking_model
     }
+
+    # 基础模型评估
+    results = evaluate_models(train_X, y, models)
 
     # 输出最终比较表格 & 图
     final_results_df = pd.DataFrame(results).T.sort_values("avg_rmse")
