@@ -248,11 +248,11 @@ def run():
     #
     # plot_stacking_diagnostics(train_X, y)
     #
-    # ## 保存训练好的模型
-    # stacking_model_e.fit(train_X, y)
-    # os.makedirs("../models", exist_ok=True)
-    # joblib.dump(stacking_model_e, "../models/stacking_model.pkl")
-    # print("✅ 模型已保存为 ../models/stacking_model.pkl")
+    ## 保存训练好的模型
+    stacking_model_e.fit(train_X, y)
+    os.makedirs("../models", exist_ok=True)
+    joblib.dump(stacking_model_e, "../models/stacking_model.pkl")
+    print("✅ 模型已保存为 ../models/stacking_model.pkl")
 
 
 if __name__ == "__main__":
