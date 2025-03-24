@@ -1,36 +1,39 @@
 import streamlit as st
-st.set_page_config(page_title="Backpack Price Predictor", layout="centered")
-
 import joblib
 import numpy as np
 import pandas as pd
 from codes.dataPreprocessing import preprocess_data
 from utils import preprocess_user_input
 
-# ------------------------- 🎯 CACHE MODEL -------------------------
+# ------------------------- 🔧 Streamlit Config -------------------------
+st.set_page_config(page_title="Backpack Price Predictor", layout="centered")
+
+# ------------------------- 📦 Caching -------------------------
+
 @st.cache_resource
 def load_model():
     return joblib.load("models/stacking_model.pkl")
 
-# 加载模型
+@st.cache_data
+def load_reference_columns():
+    train_X, _, _, _ = preprocess_data("dataset/train.csv", "dataset/test.csv")
+    return train_X.columns.tolist(), train_X["Weight Capacity (kg)"].max()
+
+# ------------------------- 🔄 Load Model & Columns -------------------------
+
 model = load_model()
+reference_columns, weight_max = load_reference_columns()
 
-# 加载参考列（特征对齐使用）
-train_X, _, _, _ = preprocess_data("dataset/train.csv", "dataset/test.csv")
-reference_columns = train_X.columns.tolist()
-weight_max = 30.0  # 从训练集中最大值提取（也可动态设置）
-
-
-# ------------------------- 🎨 PAGE UI -------------------------
-
+# ------------------------- 🎨 Page UI -------------------------
 
 st.title("🎒 Backpack Price Predictor")
-st.markdown("Predict the price💰of your backpack based on key features you choose.")
+st.markdown("Predict the price 💰 of your backpack.")
 
 st.markdown("---")
 st.header("🧾 Select Backpack Features")
 
-# ------------------------- USER INPUT -------------------------
+# ------------------------- 🧍 User Inputs -------------------------
+
 brand = st.selectbox("Brand", ['Adidas', 'Jansport', 'Nike', 'Puma', 'Under Armour'])
 material = st.selectbox("Material", ['Canvas', 'Leather', 'Nylon', 'Polyester'])
 size = st.selectbox("Size", ['Large', 'Medium', 'Small'])
@@ -43,10 +46,11 @@ with col1:
 with col2:
     waterproof = st.radio("Waterproof", ['Yes', 'No'])
 
-compartments = st.slider("Compartments", 1, 10, 3)
-weight = st.slider("Weight Capacity (kg)", 5.0, 30.0, 10.0, step=0.5)
+compartments = st.slider("Compartments", min_value=1, max_value=10, value=3)
+weight = st.slider("Weight Capacity (kg)", min_value=5.0, max_value=30.0, value=10.0, step=0.5)
 
-# ------------------------- PREDICT -------------------------
+# ------------------------- 📋 Pack User Inputs -------------------------
+
 user_input = {
     "Brand": brand,
     "Material": material,
@@ -59,15 +63,20 @@ user_input = {
     "Weight Capacity (kg)": weight
 }
 
+# ------------------------- 🎯 Predict -------------------------
+
 st.markdown("---")
-if st.button("🎯 Predict Price"):
-    with st.spinner("Predicting price... Please wait ⏳"):
+if st.button("🔮 Predict Backpack Price"):
+    with st.spinner("Predicting... please wait ⏳"):
         try:
             input_df = preprocess_user_input(user_input, reference_columns, weight_max)
-            pred_price = model.predict(input_df)[0]
-            st.success(f"💸 Predicted Backpack Price: ${pred_price:.2f}")
+            price_pred = model.predict(input_df)[0]
+            st.success(f"💸 Predicted Backpack Price: ${price_pred:.2f}")
+
+            # Debug info
             # st.write("🧪 Input shape:", input_df.shape)
             # st.write("📚 Model input shape:", model.n_features_in_)
+
         except Exception as e:
-            st.error("❌ An error occurred during prediction.")
+            st.error("❌ Something went wrong during prediction.")
             st.exception(e)
