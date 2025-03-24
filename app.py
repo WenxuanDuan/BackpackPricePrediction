@@ -1,48 +1,36 @@
 import streamlit as st
 import joblib
 import numpy as np
+import pandas as pd
 from utils import preprocess_user_input
 
-# ------------------------- 🔧 Streamlit Config -------------------------
 st.set_page_config(page_title="Backpack Price Predictor", layout="centered")
 
-# ------------------------- 📦 Caching -------------------------
+# ------------------------- 🎯 LOAD MODELS AND REFERENCES -------------------------
+
 @st.cache_resource
 def load_model():
     return joblib.load("models/stacking_model.pkl")
 
 @st.cache_resource
-def load_reference_columns():
-    return joblib.load("models/reference_columns.pkl")
+def load_preprocessing_files():
+    ref_cols = joblib.load("models/reference_columns.pkl")
+    weight_max = joblib.load("models/weight_max.pkl")
+    scaler = joblib.load("models/minmax_scaler.pkl")
+    scaler_cols = joblib.load("models/scaler_columns.pkl")
+    return ref_cols, weight_max, scaler, scaler_cols
 
-@st.cache_resource
-def load_weight_max():
-    return joblib.load("models/weight_max.pkl")
-
-@st.cache_resource
-def load_scaler():
-    return joblib.load("models/minmax_scaler.pkl")
-
-@st.cache_resource
-def load_scaler_columns():
-    return joblib.load("models/scaler_columns.pkl")
-
-
-# ------------------------- 🔄 Load Model & Resources -------------------------
+# 加载模型和处理器
 model = load_model()
-reference_columns = load_reference_columns()
-weight_max = load_weight_max()
-scaler = load_scaler()
-scaler_columns = load_scaler_columns()
+reference_columns, weight_max, minmax_scaler, scaler_columns = load_preprocessing_files()
 
-# ------------------------- 🎨 Page UI -------------------------
+
+# ------------------------- 🎨 PAGE UI -------------------------
 st.title("🎒 Backpack Price Predictor")
-st.markdown("Predict the price 💰 of your backpack.")
-
+st.markdown("Predict the price💰of your backpack based on key features you choose.")
 st.markdown("---")
 st.header("🧾 Select Backpack Features")
 
-# ------------------------- 🧍 User Inputs -------------------------
 brand = st.selectbox("Brand", ['Adidas', 'Jansport', 'Nike', 'Puma', 'Under Armour'])
 material = st.selectbox("Material", ['Canvas', 'Leather', 'Nylon', 'Polyester'])
 size = st.selectbox("Size", ['Large', 'Medium', 'Small'])
@@ -55,10 +43,9 @@ with col1:
 with col2:
     waterproof = st.radio("Waterproof", ['Yes', 'No'])
 
-compartments = st.slider("Compartments", min_value=1, max_value=10, value=3)
-weight = st.slider("Weight Capacity (kg)", min_value=5.0, max_value=30.0, value=10.0, step=0.5)
+compartments = st.slider("Compartments", 1, 10, 3)
+weight = st.slider("Weight Capacity (kg)", 5.0, 30.0, 10.0, step=0.5)
 
-# ------------------------- 📋 Pack User Inputs -------------------------
 user_input = {
     "Brand": brand,
     "Material": material,
@@ -71,18 +58,34 @@ user_input = {
     "Weight Capacity (kg)": weight
 }
 
-# ------------------------- 🎯 Predict -------------------------
 st.markdown("---")
-if st.button("🔮 Predict Backpack Price"):
-    with st.spinner("Predicting... please wait ⏳"):
+
+# 在 predict 按钮中处理：
+if st.button("🎯 Predict Price"):
+
+    with st.spinner("Predicting price... Please wait ⏳"):
         try:
-            input_df = preprocess_user_input(user_input, reference_columns, weight_max, scaler, scaler_columns)
-            price_pred = model.predict(input_df)[0]
-            st.success(f"💸 Predicted Backpack Price: ${price_pred:.2f}")
+            input_df = preprocess_user_input(user_input, reference_columns, weight_max, minmax_scaler, scaler_columns)
+
+            # 调试：确认列一致性
+            missing = set(reference_columns) - set(input_df.columns)
+            extra = set(input_df.columns) - set(reference_columns)
+            if missing:
+                st.error(f"Missing columns: {missing}")
+            if extra:
+                st.warning(f"Extra columns not needed: {extra}")
+
+            pred_price = model.predict(input_df)[0]
+            # st.write("🎯 Input DF columns:", sorted(input_df.columns.tolist()))
+            # st.write("🎯 Reference columns:", sorted(reference_columns))
+            st.success(f"💸 Predicted Backpack Price: ${pred_price:.2f}")
+            # st.write("🧪 Transformed input:", input_df)
+
         except Exception as e:
-            st.error("❌ Something went wrong during prediction.")
+            st.error("❌ An error occurred during prediction.")
             st.exception(e)
 
 # Optional footer
 st.markdown("---")
 st.markdown("<div style='text-align:center; font-size:13px;'>Made by Wenxuan Duan</div>", unsafe_allow_html=True)
+

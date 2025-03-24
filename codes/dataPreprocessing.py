@@ -90,8 +90,8 @@ def preprocess_data(train_path, test_path):
                              'Brand_Material', 'Brand_Size', 'Has_Laptop_Compartment','Is_Waterproof', 
                              'Compartments_Category', 'Style_Size']
     
-    train_encoded = pd.get_dummies(train[categorical_to_encode], drop_first=True)
-    test_encoded = pd.get_dummies(test[categorical_to_encode], drop_first=True)
+    train_encoded = pd.get_dummies(train[categorical_to_encode], drop_first=False)
+    test_encoded = pd.get_dummies(test[categorical_to_encode], drop_first=False)
 
     # 数值特征标准化
     train_num = train.drop(categorical_to_encode, axis=1)
